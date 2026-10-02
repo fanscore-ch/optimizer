@@ -1,6 +1,6 @@
 module github.com/fanscore-ch/optimizer/gen/go
 
-go 1.25.0
+go 1.26.4
 
 require (
 	google.golang.org/grpc v1.84.0
