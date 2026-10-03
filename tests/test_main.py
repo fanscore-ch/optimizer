@@ -10,7 +10,7 @@ import grpc
 from optimizer.health import check_health
 
 
-def test_cli_reads_environment_and_shuts_down_cleanly(tmp_path):
+def test_cli_uses_listen_address_and_exits_on_sigterm(tmp_path):
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         address = f"127.0.0.1:{listener.getsockname()[1]}"

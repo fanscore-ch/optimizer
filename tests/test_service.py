@@ -5,10 +5,10 @@ import grpc
 import pytest
 from ortools.sat import cp_model_pb2, sat_parameters_pb2
 
-from optimizer import handler
+from fanscore.optimizer.v1 import optimizer_pb2
+from optimizer import grpc_service
 from optimizer.health import check_health
 from optimizer.solver import Solver
-from optimizer.v1 import optimizer_pb2
 
 
 def test_solves_knapsack_over_grpc(running_server, knapsack):
@@ -55,6 +55,7 @@ def test_requires_model(running_server):
     with running_server() as (stub, _), pytest.raises(grpc.RpcError) as error:
         stub.Solve(optimizer_pb2.SolveRequest(), timeout=2)
     assert error.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+    assert error.value.details() == "model: value is required"
 
 
 @pytest.mark.parametrize(
@@ -97,7 +98,7 @@ def test_capacity_rejection_keeps_health_available(
             assert release.wait(3)
             return super().solve(remaining_seconds)
 
-    monkeypatch.setattr(handler, "Solver", PausedSolver)
+    monkeypatch.setattr(grpc_service, "Solver", PausedSolver)
     with running_server(max_concurrent_solves=1) as (stub, address):
         first = stub.Solve.future(optimizer_pb2.SolveRequest(model=knapsack), timeout=5)
         try:
@@ -133,7 +134,7 @@ def test_rpc_termination_stops_native_search(
             cancelled.set()
             super().cancel()
 
-    monkeypatch.setattr(handler, "Solver", ObservedSolver)
+    monkeypatch.setattr(grpc_service, "Solver", ObservedSolver)
     with running_server(max_concurrent_solves=1, max_solve_seconds=20) as (stub, _):
         timeout = 1 if termination == "deadline" else 10
         future = stub.Solve.future(
@@ -168,17 +169,29 @@ def test_rpc_termination_stops_native_search(
         assert result.status == cp_model_pb2.OPTIMAL
 
 
-def test_server_time_limit_returns_solver_status(running_server, hard_model):
+def test_server_time_limit_bounds_native_search(
+    running_server, hard_model, monkeypatch
+):
+    limits = []
+
+    class ObservedSolver(Solver):
+        def solve(self, remaining_seconds):
+            limits.append(remaining_seconds)
+            return super().solve(remaining_seconds)
+
+    monkeypatch.setattr(grpc_service, "Solver", ObservedSolver)
     with running_server(max_solve_seconds=0.2) as (stub, _):
         result = stub.Solve(
             optimizer_pb2.SolveRequest(model=hard_model), timeout=3
         ).result
+    assert len(limits) == 1
+    assert 0 < limits[0] <= 0.2
     assert result.status in (
         cp_model_pb2.UNKNOWN,
         cp_model_pb2.FEASIBLE,
         cp_model_pb2.OPTIMAL,
     )
-    assert result.wall_time < 2
+    assert result.wall_time < 0.7
 
 
 def test_message_size_is_bounded(running_server):

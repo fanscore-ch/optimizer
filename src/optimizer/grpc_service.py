@@ -5,9 +5,9 @@ import time
 import grpc
 from ortools.sat import cp_model_pb2
 
+from fanscore.optimizer.v1 import optimizer_pb2, optimizer_pb2_grpc
 from optimizer.config import Config
 from optimizer.solver import Solver, prepare_parameters
-from optimizer.v1 import optimizer_pb2, optimizer_pb2_grpc
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class OptimizerServicer(optimizer_pb2_grpc.OptimizerServiceServicer):
     ) -> optimizer_pb2.SolveResponse:
         started = time.monotonic()
         if not request.HasField("model"):
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "model is required")
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "model: value is required")
         if not self._slots.acquire(blocking=False):
             context.abort(
                 grpc.StatusCode.RESOURCE_EXHAUSTED, "solver capacity exhausted"

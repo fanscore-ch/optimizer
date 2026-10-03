@@ -1,5 +1,4 @@
 import subprocess
-import sys
 from pathlib import Path
 
 from google.protobuf import descriptor_pb2
@@ -22,17 +21,16 @@ def normalize_descriptor(message):
 def test_vendored_protos_match_runtime(tmp_path):
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "descriptor.pb"
-    # Isolate protoc from OR-Tools' native protobuf library to avoid Linux crashes.
     subprocess.run(
         [
-            sys.executable,
-            "-m",
-            "grpc_tools.protoc",
-            f"-I{root / 'proto'}",
-            f"--descriptor_set_out={output}",
-            "ortools/sat/cp_model.proto",
-            "ortools/sat/sat_parameters.proto",
+            "buf",
+            "build",
+            "--as-file-descriptor-set",
+            "--exclude-source-info",
+            "--output",
+            str(output),
         ],
+        cwd=root,
         check=True,
     )
     descriptors = descriptor_pb2.FileDescriptorSet.FromString(output.read_bytes())

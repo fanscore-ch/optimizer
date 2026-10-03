@@ -1,0 +1,15 @@
+version: v2
+modules:
+  - path: proto
+    name: buf.build/fanscore-ch/optimizer
+lint:
+  use:
+    - STANDARD
+    - COMMENTS
+    - UNARY_RPC
+  disallow_comment_ignores: true
+  ignore:
+    - proto/ortools
+breaking:
+  use:
+    - FILE

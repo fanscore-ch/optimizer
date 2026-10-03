@@ -5,9 +5,9 @@ import grpc
 import pytest
 from ortools.sat import cp_model_pb2
 
+from fanscore.optimizer.v1 import optimizer_pb2_grpc
 from optimizer.config import Config
 from optimizer.server import create_server
-from optimizer.v1 import optimizer_pb2_grpc
 
 
 @pytest.fixture

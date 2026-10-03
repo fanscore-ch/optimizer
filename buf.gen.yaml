@@ -1,0 +1,12 @@
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/python:v33.5
+    revision: 1
+    out: src
+  - remote: buf.build/grpc/python:v1.81.1
+    revision: 1
+    out: src
+inputs:
+  - directory: .
+    paths:
+      - proto/fanscore/optimizer
