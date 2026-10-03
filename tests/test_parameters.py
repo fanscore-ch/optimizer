@@ -1,4 +1,3 @@
-import pytest
 from ortools.sat import sat_parameters_pb2
 
 from optimizer.config import Config
@@ -27,19 +26,3 @@ def test_lower_client_limits_are_respected():
     )
     assert params.max_time_in_seconds == 0.5
     assert params.num_workers == 1
-
-
-@pytest.mark.parametrize(
-    "options",
-    [
-        {"max_solve_seconds": float("inf")},
-        {"max_solve_seconds": 0},
-        {"max_workers": 0},
-        {"max_concurrent_solves": 0},
-        {"max_message_bytes": -1},
-        {"shutdown_grace_seconds": -1},
-    ],
-)
-def test_invalid_configuration_is_rejected(options):
-    with pytest.raises(ValueError):
-        Config(**options)

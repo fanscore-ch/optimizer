@@ -3,8 +3,8 @@ import argparse
 import grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
+from optimizer import SERVICE_NAME
 from optimizer.config import health_address_from_env
-from optimizer.v1 import SERVICE_NAME
 
 
 def check_health(address: str) -> bool:

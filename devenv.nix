@@ -13,21 +13,29 @@
     };
   };
 
-  languages.go.enable = true;
-
-  packages = [ pkgs.git ];
+  packages = [
+    pkgs.git
+    pkgs.buf
+    pkgs.diffutils
+  ];
 
   scripts = {
-    generate.exec = "uv run python scripts/generate.py";
-    generate-go.exec = "uv run python scripts/generate.py --go";
+    generate.exec = "buf generate";
     check-generated.exec = ''
       set -e
-      uv run python scripts/generate.py --check
-      uv run python scripts/generate.py --go --check
+      generated="$(mktemp -d)"
+      trap 'rm -rf "$generated"' EXIT
+      buf generate --output "$generated"
+      diff -ru -x __pycache__ src/fanscore/optimizer/v1 "$generated/src/fanscore/optimizer/v1"
     '';
-    lint.exec = "uv run ruff check && uv run ruff format --check";
+    lint.exec = ''
+      set -e
+      buf lint
+      buf format --diff --exit-code --path proto/fanscore/optimizer
+      uv run ruff check
+      uv run ruff format --check
+    '';
     test.exec = "uv run pytest";
-    test-go.exec = "uv run python scripts/test_go.py";
     health.exec = "uv run optimizer-health";
   };
 
@@ -39,12 +47,12 @@
     ruff = {
       enable = true;
       entry = "uv run ruff check";
-      excludes = [ "^src/optimizer/v1/[^/]+_pb2(\\.pyi?|_grpc\\.py)$" ];
+      excludes = [ "^src/fanscore/" ];
     };
     ruff-format = {
       enable = true;
       entry = "uv run ruff format --check";
-      excludes = [ "^src/optimizer/v1/[^/]+_pb2(\\.pyi?|_grpc\\.py)$" ];
+      excludes = [ "^src/fanscore/" ];
     };
     check-merge-conflicts.enable = true;
     check-yaml.enable = true;

@@ -1,55 +1,48 @@
 # Optimizer
 
 FanScore's stateless gRPC service for OR-Tools CP-SAT models. Platform builds
-models and handles business rules and transactions; Optimizer executes solves.
+models and handles business rules; Optimizer executes solves.
 
-## Prerequisites
+## Run
 
-- [devenv](https://devenv.sh/)
-
-## Quick Start
+Install [devenv](https://devenv.sh/), then:
 
 ```sh
 devenv up
 ```
 
-Devenv supplies Python 3.14 and Go and installs the locked dependencies.
-The service listens on port `50051`; the default binding is `[::]:50051`.
-Configuration comes from environment variables documented in [`.env.example`](.env.example).
+Devenv supplies Python, Buf, and the locked dependencies.
+The service listens on port `50051`. See [`.env.example`](.env.example) for configuration.
 
 ## Development
 
 ```sh
-devenv shell -- generate          # Python bindings
-devenv shell -- generate-go       # Go bindings
-devenv shell -- check-generated   # Verify generated bindings
+devenv shell -- generate          # Generate Python service bindings with Buf
+devenv shell -- check-generated   # Check bindings match the schema
 devenv shell -- lint
-devenv shell -- test              # Python tests
-devenv shell -- test-go           # Go client against a temporary Python server
+devenv shell -- test
 devenv shell -- health            # Probe the running service
 ```
 
-CI runs the same checks and also builds and verifies the container.
+After changing the [service schema](proto/fanscore/optimizer/v1/optimizer.proto),
+run `generate` and commit the updated Python bindings with the schema.
+CI checks that bindings match and that the contract remains compatible with BSR `main`.
 
-## API
+The service reuses OR-Tools' installed Python messages. Vendored schemas in
+`proto/ortools` must match the installed OR-Tools version; descriptor tests enforce this.
 
-[`OptimizerService.Solve`](proto/optimizer/v1/optimizer.proto) accepts an OR-Tools
-model and supported solver parameters and returns its solver response. Only use
-solutions with status `OPTIMAL` or `FEASIBLE`. Set an RPC deadline; server limits
-cap solve time, workers, concurrent solves, and message size.
+## Smoke test
 
-Python bindings live in `src/optimizer/v1`. The generated Go module lives in
-`gen/go`; Platform imports it at a pinned version. Upstream protobufs and OR-Tools
-versions must match; [descriptor tests](tests/test_proto.py) verify this.
+With the service running:
 
-## Project Structure
-
-```text
-src/optimizer/       # gRPC server, configuration, and solver
-proto/               # Service contract and vendored OR-Tools protos
-gen/go/              # Generated Go client and OR-Tools messages
-scripts/             # Binding generation and Go integration runner
-tests/               # Python tests
-devenv.nix           # Toolchain, scripts, process, and hooks
-Dockerfile           # Production image
+```sh
+buf curl --schema . --protocol grpc --http2-prior-knowledge \
+  -d '{"model":{}}' \
+  http://127.0.0.1:50051/fanscore.optimizer.v1.OptimizerService/Solve
 ```
+
+## API and SDKs
+
+See the [contract documentation](proto/buf.md) for RPC behavior and supported parameters.
+Generated client SDKs are available from
+[`buf.build/fanscore-ch/optimizer`](https://buf.build/fanscore-ch/optimizer).

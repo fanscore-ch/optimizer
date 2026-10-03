@@ -15,10 +15,6 @@ updates:
     groups:
       python:
         patterns: ["*"]
-  - package-ecosystem: gomod
-    directory: /gen/go
-    schedule:
-      interval: weekly
   - package-ecosystem: docker
     directory: /
     schedule:

@@ -3,9 +3,10 @@ from concurrent.futures import ThreadPoolExecutor
 import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
+from fanscore.optimizer.v1 import optimizer_pb2_grpc
+from optimizer import SERVICE_NAME
 from optimizer.config import Config
-from optimizer.handler import OptimizerServicer
-from optimizer.v1 import SERVICE_NAME, optimizer_pb2_grpc
+from optimizer.grpc_service import OptimizerServicer
 
 
 def create_server(
