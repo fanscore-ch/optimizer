@@ -6,6 +6,7 @@ from ortools.sat import cp_model_pb2, sat_parameters_pb2
 from ortools.sat.python import cp_model_helper
 
 from optimizer.config import Config
+from optimizer.errors import InvalidArgument
 
 SUPPORTED_PARAMETERS = frozenset(
     {
@@ -26,19 +27,27 @@ def prepare_parameters(
     fields = {field.name for field, _ in requested.ListFields()}
     unsupported = fields - SUPPORTED_PARAMETERS
     if unsupported:
-        raise ValueError(f"unsupported parameters: {', '.join(sorted(unsupported))}")
+        names = ", ".join(sorted(unsupported))
+        message = f"unsupported parameters: {names}"
+        raise InvalidArgument(
+            message,
+            "UNSUPPORTED_PARAMETERS",
+            metadata={"parameters": names},
+            violations={f"parameters.{name}": message for name in sorted(unsupported)},
+        )
     for name in ("max_time_in_seconds", "max_deterministic_time"):
         if requested.HasField(name):
             value = getattr(requested, name)
             if not math.isfinite(value) or value <= 0:
-                raise ValueError(f"{name} must be finite and greater than zero")
+                _invalid_parameter(name, value, "finite and greater than zero")
     for name in ("relative_gap_limit", "absolute_gap_limit"):
         value = getattr(requested, name)
         if not math.isfinite(value) or value < 0:
-            raise ValueError(f"{name} must be finite and nonnegative")
+            _invalid_parameter(name, value, "finite and nonnegative")
     for name in ("num_workers", "random_seed"):
-        if getattr(requested, name) < 0:
-            raise ValueError(f"{name} must be nonnegative")
+        value = getattr(requested, name)
+        if value < 0:
+            _invalid_parameter(name, value, "nonnegative")
 
     parameters = sat_parameters_pb2.SatParameters()
     parameters.CopyFrom(requested)
@@ -48,6 +57,16 @@ def prepare_parameters(
     workers = requested.num_workers or config.max_workers
     parameters.num_workers = min(workers, config.max_workers)
     return parameters
+
+
+def _invalid_parameter(name: str, value: float | int, requirement: str) -> None:
+    message = f"{name} must be {requirement}"
+    raise InvalidArgument(
+        message,
+        "INVALID_PARAMETER",
+        metadata={"parameter": name, "value": str(value), "requirement": requirement},
+        violations={f"parameters.{name}": message},
+    )
 
 
 class Solver:
@@ -60,12 +79,22 @@ class Solver:
         # through the exposed text-format API.
         self._model = cp_model_helper.CpModelProto()
         if not self._model.parse_text_format(text_format.MessageToString(model)):
-            raise ValueError("model could not be parsed by OR-Tools")
+            message = "model could not be parsed by OR-Tools"
+            raise InvalidArgument(
+                message,
+                "MODEL_PARSE_ERROR",
+                violations={"model": message},
+            )
         self._parameters = cp_model_helper.SatParameters()
         if not self._parameters.parse_text_format(
             text_format.MessageToString(parameters)
         ):
-            raise ValueError("parameters could not be parsed by OR-Tools")
+            message = "parameters could not be parsed by OR-Tools"
+            raise InvalidArgument(
+                message,
+                "PARAMETERS_PARSE_ERROR",
+                violations={"parameters": message},
+            )
         # Construct the wrapper before registering cancellation. StopSearch then
         # also applies when the RPC ends immediately before Solve starts.
         self._wrapper = cp_model_helper.SolveWrapper()
@@ -84,4 +113,19 @@ class Solver:
             self._finished.set()
         result = cp_model_pb2.CpSolverResponse()
         text_format.Parse(str(native_result), result)
+        if result.status == cp_model_pb2.MODEL_INVALID:
+            # CP-SAT uses MODEL_INVALID for parameter errors too. Only name the
+            # model field when independent model validation confirms it is bad.
+            model_error = cp_model_helper.CpSatHelper.validate_model(self._model)
+            if model_error:
+                raise InvalidArgument(
+                    "The model is invalid. Correct its field violations.",
+                    "MODEL_INVALID",
+                    violations={"model": model_error},
+                )
+            raise InvalidArgument(
+                "The solve input is invalid. Check the model and solver parameters.",
+                "INVALID_INPUT",
+                metadata={"validationError": result.solution_info},
+            )
         return result
