@@ -28,6 +28,7 @@ class OptimizerServiceServicer:
 
     def Solve(self, request, context):
         """Solves a caller-defined model. No application data is loaded or persisted.
+        Invalid input returns INVALID_ARGUMENT, with field violations when known.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

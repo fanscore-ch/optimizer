@@ -9,6 +9,7 @@ import "ortools/sat/sat_parameters.proto";
 // Executes caller-defined OR-Tools CP-SAT models within server resource limits.
 service OptimizerService {
   // Solves a caller-defined model. No application data is loaded or persisted.
+  // Invalid input returns INVALID_ARGUMENT, with field violations when known.
   rpc Solve(SolveRequest) returns (SolveResponse);
 }
 
@@ -27,7 +28,8 @@ message SolveRequest {
 
 // The solver's status, solution, and execution statistics.
 message SolveResponse {
-  // Includes OPTIMAL, FEASIBLE, INFEASIBLE, MODEL_INVALID, or UNKNOWN.
+  // Includes OPTIMAL, FEASIBLE, INFEASIBLE, or UNKNOWN.
+  // MODEL_INVALID is returned as an INVALID_ARGUMENT RPC error instead.
   // A solution may only be consumed for OPTIMAL or FEASIBLE.
   operations_research.sat.CpSolverResponse result = 1;
 }
